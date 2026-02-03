@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, FileRejection } from "react-dropzone";
 
 interface DocumentUploadProps {
   onUploadComplete: (fileName: string) => void;
@@ -14,8 +14,8 @@ export default function DocumentUpload({
   const [error, setError] = useState<string | null>(null);
 
   const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      const file = acceptedFiles[0];
+    async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
+      const file = acceptedFiles[0] || rejectedFiles[0]?.file;
       if (!file) return;
 
       setUploading(true);
