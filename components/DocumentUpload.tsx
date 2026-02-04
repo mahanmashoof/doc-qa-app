@@ -16,17 +16,16 @@ export default function DocumentUpload({
   const onDrop = useCallback(
     async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
       const file = acceptedFiles[0] || rejectedFiles[0]?.file;
+
       if (!file) return;
 
       setUploading(true);
       setError(null);
 
       try {
-        // Create FormData to send file
         const formData = new FormData();
         formData.append("file", file);
 
-        // Send to API
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
@@ -38,7 +37,6 @@ export default function DocumentUpload({
           throw new Error(data.error || "Upload failed");
         }
 
-        console.log("Upload successful:", data);
         onUploadComplete(file.name);
       } catch (err) {
         console.error("Upload error:", err);

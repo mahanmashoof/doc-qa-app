@@ -28,7 +28,7 @@ npm install @anthropic-ai/sdk openai
 
 ### PDF processing
 
-npm install pdf-parse
+npm install unpdf
 
 ### Supabase client
 

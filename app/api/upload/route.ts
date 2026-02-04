@@ -1,3 +1,4 @@
+import { extractTextFromPDF } from "@/lib/pdfUtils";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -18,8 +19,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (max 10MB for now)
-    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    // Validate file size
+    const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       return NextResponse.json(
         { error: "File too large. Maximum size is 10MB" },
@@ -27,13 +28,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("✅ File received:", {
-      name: file.name,
-      type: file.type,
-      size: `${(file.size / 1024).toFixed(2)} KB`,
-    });
+    console.log("✅ File received:", file.name);
 
-    // TODO: In Chapter 5, we'll extract text here
+    // extract text
+    const text = await extractTextFromPDF(file);
+    console.log("✅ Text extracted:", {
+      length: text.length,
+      wordCount: text.split(/\s+/).length,
+    });
     // TODO: In Chapter 6, we'll chunk it
     // TODO: In Chapters 7-9, we'll create embeddings and store them
 
@@ -46,9 +48,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Upload error:", error);
-    return NextResponse.json(
-      { error: "Failed to process upload" },
-      { status: 500 },
-    );
+
+    const message =
+      error instanceof Error ? error.message : "Failed to process pdf";
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
