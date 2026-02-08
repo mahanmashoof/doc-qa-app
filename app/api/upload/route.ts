@@ -1,4 +1,5 @@
 import { extractTextFromPDF } from "@/lib/pdfUtils";
+import { chunkText } from "@/lib/textChunker";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -37,14 +38,26 @@ export async function POST(request: NextRequest) {
       wordCount: text.split(/\s+/).length,
     });
     // TODO: In Chapter 6, we'll chunk it
+    const chunks = chunkText(text);
+
+    console.log("✅ Text chunked:", {
+      totalChunks: chunks.length,
+      avgWordsPerChunk: Math.round(
+        chunks.reduce((sum, chunk) => sum + chunk.wordCount, 0) / chunks.length,
+      ),
+    });
     // TODO: In Chapters 7-9, we'll create embeddings and store them
 
     // For now, just return success
     return NextResponse.json({
       success: true,
-      message: "File received successfully",
+      message: "File processed successfully",
       fileName: file.name,
-      fileSize: file.size,
+      stats: {
+        textLength: text.length,
+        totalChunks: chunks.length,
+        sampleChunk: chunks[0]?.content.substring(0, 200) + "...",
+      },
     });
   } catch (error) {
     console.error("Upload error:", error);
