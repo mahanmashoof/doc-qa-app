@@ -1,3 +1,4 @@
+import { storeDocumentChunks } from "@/lib/documentStore";
 import { extractTextFromPDF } from "@/lib/pdfUtils";
 import { chunkText } from "@/lib/textChunker";
 import { NextRequest, NextResponse } from "next/server";
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
       ),
     });
     // TODO: In Chapters 7-9, we'll create embeddings and store them
+    await storeDocumentChunks({ chunks, documentName: file.name });
 
     // For now, just return success
     return NextResponse.json({

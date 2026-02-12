@@ -16,6 +16,17 @@ export function chunkText(
     return [];
   }
 
+  // If document is smaller than chunk size, return as single chunk
+  if (words.length <= chunkSize) {
+    return [
+      {
+        content: words.join(" "),
+        index: 0,
+        wordCount: words.length,
+      },
+    ];
+  }
+
   const chunks: TextChunk[] = [];
   let startIndex = 0;
 
