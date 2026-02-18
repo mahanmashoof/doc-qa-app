@@ -1,16 +1,7 @@
 "use client";
 
+import { ChatInterfaceProps, Message } from "@/types/interfaces";
 import { useState } from "react";
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
-
-interface ChatInterfaceProps {
-  documentName: string;
-  onReset: () => void;
-}
 
 export default function ChatInterface({
   documentName,
@@ -20,7 +11,7 @@ export default function ChatInterface({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
 
@@ -29,17 +20,38 @@ export default function ChatInterface({
     setInput("");
     setLoading(true);
 
-    // TODO: Actually send to API
-    // For now, simulate response
-    setTimeout(() => {
+    try {
+      // Call our chat API
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question: input }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to get answer");
+      }
+
       const assistantMessage: Message = {
         role: "assistant",
-        content:
-          "This is a placeholder response. In Chapter 11-13, this will be a real AI answer!",
+        content: data.answer,
       };
+
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error:", error);
+      const errorMessage: Message = {
+        role: "assistant",
+        content: "Sorry, I encountered an error processing your question.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
