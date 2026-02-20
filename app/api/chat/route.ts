@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchDocuments } from "@/lib/documentSearch";
+import { buildRAGPrompt, callClaudeWithRetry } from "@/lib/anthropic";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,16 +34,29 @@ export async function POST(request: NextRequest) {
       );
     });
 
-    // TODO: Chapter 11-13 - Send to Claude for actual answer
-    // For now, just return the chunks
-    return NextResponse.json({
-      answer:
-        "This is a placeholder. In Chapter 12, Claude will generate a real answer based on these chunks.",
-      sources: results.map((r) => ({
-        content: r.content,
-        similarity: r.similarity,
-      })),
-    });
+    // Combine chunks into context
+    const context = results
+      .map((r, idx) => `[Chunk ${idx + 1}]:\n${r.content}`)
+      .join("\n\n");
+
+    // Build prompt
+    const prompt = buildRAGPrompt(question, context);
+
+    // Call Claude with retry logic
+    const answer = await callClaudeWithRetry(prompt);
+
+    console.log("✅ Claude responded");
+
+    return new Response(
+      JSON.stringify({
+        answer,
+        sources: results.map((r) => ({
+          content: r.content.substring(0, 200) + "...",
+          similarity: r.similarity,
+        })),
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    );
   } catch (error) {
     console.error("Chat error:", error);
 
