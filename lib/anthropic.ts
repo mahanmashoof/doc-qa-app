@@ -26,50 +26,43 @@ Instructions:
 Answer:`;
 }
 
-// Helper with retry logic
-export async function callClaudeWithRetry(
+// Add new streaming function
+export async function callClaudeStreaming(
   prompt: string,
-  maxRetries: number = 3,
-): Promise<string> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`🤖 Calling Claude (attempt ${attempt}/${maxRetries})...`);
+): Promise<ReadableStream> {
+  const encoder = new TextEncoder();
 
-      const message = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307", // Use latest stable Sonnet 3.5
-        max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      });
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        const stream = await anthropic.messages.create({
+          model: "claude-3-haiku-20240307",
+          max_tokens: 1024,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          stream: true, // Enable streaming
+        });
 
-      const answer =
-        message.content[0].type === "text"
-          ? message.content[0].text
-          : "Unable to generate answer";
+        // Iterate through the stream
+        for await (const messageStreamEvent of stream) {
+          // Only handle content block delta events with text
+          if (
+            messageStreamEvent.type === "content_block_delta" &&
+            messageStreamEvent.delta.type === "text_delta"
+          ) {
+            controller.enqueue(encoder.encode(messageStreamEvent.delta.text));
+          }
+        }
 
-      return answer;
-    } catch (error: unknown) {
-      const isOverloaded =
-        error instanceof Error &&
-        "status" in error &&
-        (error as { status: number }).status === 529;
-      const isLastAttempt = attempt === maxRetries;
-
-      if (isOverloaded && !isLastAttempt) {
-        const waitTime = Math.min(1000 * Math.pow(2, attempt), 10000); // Exponential backoff
-        console.log(`⏳ API overloaded, waiting ${waitTime}ms before retry...`);
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-        continue;
+        controller.close();
+      } catch (error) {
+        console.error("Streaming error:", error);
+        controller.error(error);
       }
-
-      // If not overloaded or last attempt, throw
-      throw error;
-    }
-  }
-
-  throw new Error("Failed to get response from Claude after retries");
+    },
+  });
 }

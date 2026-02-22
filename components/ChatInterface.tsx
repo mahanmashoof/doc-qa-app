@@ -1,7 +1,7 @@
 "use client";
 
 import { ChatInterfaceProps, Message } from "@/types/interfaces";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function ChatInterface({
   documentName,
@@ -10,6 +10,10 @@ export default function ChatInterface({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,38 +21,67 @@ export default function ChatInterface({
 
     const userMessage: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
+    const currentQuestion = input;
     setInput("");
     setLoading(true);
 
+    // Add empty assistant message immediately
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
     try {
-      // Call our chat API
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question: input }),
+        body: JSON.stringify({ question: currentQuestion }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || "Failed to get answer");
+        throw new Error("Failed to get answer");
       }
 
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: data.answer,
-      };
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      if (!reader) {
+        throw new Error("No response stream");
+      }
+
+      // Accumulate the full text here
+      let fullText = "";
+
+      // Read stream
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        fullText += chunk;
+
+        // Update message with accumulated text
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastMessage = updated[updated.length - 1];
+          if (lastMessage && lastMessage.role === "assistant") {
+            lastMessage.content = fullText; // Set to accumulated text, not append
+          }
+          return updated;
+        });
+      }
     } catch (error) {
       console.error("Error:", error);
-      const errorMessage: Message = {
-        role: "assistant",
-        content: "Sorry, I encountered an error processing your question.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      // Replace the empty assistant message with error
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastMessage = updated[updated.length - 1];
+        if (lastMessage && lastMessage.role === "assistant") {
+          lastMessage.content =
+            "Sorry, I encountered an error processing your question.";
+        }
+        return updated;
+      });
     } finally {
       setLoading(false);
     }
@@ -113,6 +146,7 @@ export default function ChatInterface({
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}

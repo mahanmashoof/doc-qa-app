@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { searchDocuments } from "@/lib/documentSearch";
-import { buildRAGPrompt, callClaudeWithRetry } from "@/lib/anthropic";
+import { buildRAGPrompt, callClaudeStreaming } from "@/lib/anthropic";
 
 export async function POST(request: NextRequest) {
   try {
     const { question } = await request.json();
 
     if (!question || typeof question !== "string") {
-      return NextResponse.json(
-        { error: "Question is required" },
-        { status: 400 },
-      );
+      return new Response(JSON.stringify({ error: "Question is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     console.log("💬 Question received:", question);
@@ -19,11 +19,10 @@ export async function POST(request: NextRequest) {
     const results = await searchDocuments(question, 3);
 
     if (results.length === 0) {
-      return NextResponse.json({
-        answer:
-          "I couldn't find any relevant information in the document to answer that question.",
-        sources: [],
-      });
+      return new Response(
+        "I couldn't find any relevant information in the document to answer that question.",
+        { headers: { "Content-Type": "text/plain" } },
+      );
     }
 
     // Log what we found
@@ -42,27 +41,26 @@ export async function POST(request: NextRequest) {
     // Build prompt
     const prompt = buildRAGPrompt(question, context);
 
-    // Call Claude with retry logic
-    const answer = await callClaudeWithRetry(prompt);
+    console.log("🤖 Streaming response from Claude...");
 
-    console.log("✅ Claude responded");
+    // Get streaming response
+    const stream = await callClaudeStreaming(prompt);
 
-    return new Response(
-      JSON.stringify({
-        answer,
-        sources: results.map((r) => ({
-          content: r.content.substring(0, 200) + "...",
-          similarity: r.similarity,
-        })),
-      }),
-      { headers: { "Content-Type": "application/json" } },
-    );
+    // Return JUST the stream, not wrapped in JSON
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+    });
   } catch (error) {
     console.error("Chat error:", error);
 
     const message =
       error instanceof Error ? error.message : "Failed to process question";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
