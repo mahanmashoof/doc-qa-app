@@ -12,6 +12,7 @@ export default function DocumentUpload({
 }: DocumentUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string>("");
 
   const onDrop = useCallback(
     async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
@@ -21,6 +22,7 @@ export default function DocumentUpload({
 
       setUploading(true);
       setError(null);
+      setUploadProgress("Uploading PDF...");
 
       try {
         const formData = new FormData();
@@ -37,12 +39,19 @@ export default function DocumentUpload({
           throw new Error(data.error || "Upload failed");
         }
 
-        onUploadComplete(file.name);
+        setUploadProgress("Processing complete!");
+        setTimeout(() => {
+          onUploadComplete(file.name);
+        }, 500);
       } catch (err) {
         console.error("Upload error:", err);
         setError(err instanceof Error ? err.message : "Upload failed");
+        setUploadProgress("");
       } finally {
-        setUploading(false);
+        setTimeout(() => {
+          setUploading(false);
+          setUploadProgress("");
+        }, 600);
       }
     },
     [onUploadComplete],
@@ -85,7 +94,20 @@ export default function DocumentUpload({
         </svg>
 
         {uploading ? (
-          <p className="text-gray-600">Processing document...</p>
+          <div>
+            <p className="text-gray-600 font-medium mb-2">{uploadProgress}</p>
+            <div className="flex items-center justify-center space-x-1">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+              <div
+                className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                style={{ animationDelay: "0.1s" }}
+              ></div>
+              <div
+                className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                style={{ animationDelay: "0.2s" }}
+              ></div>
+            </div>
+          </div>
         ) : isDragActive ? (
           <p className="text-blue-600 font-medium">Drop your PDF here</p>
         ) : (
@@ -109,8 +131,22 @@ export default function DocumentUpload({
       )}
 
       {error && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600 text-sm">{error}</p>
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+          <svg
+            className="w-5 h-5 text-red-500 mt-0.5 mr-3"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <div>
+            <p className="text-red-600 text-sm font-medium">Upload Error</p>
+            <p className="text-red-600 text-sm mt-1">{error}</p>
+          </div>
         </div>
       )}
     </div>
