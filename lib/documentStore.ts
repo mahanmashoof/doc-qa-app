@@ -2,31 +2,38 @@ import { supabase } from "./supabase";
 import { generateEmbedding } from "./openai";
 import type { DocumentChunk } from "./supabase";
 
-interface IProps {
-  chunks: { content: string; index: number }[];
-  documentName: string;
-}
+export async function storeDocumentChunks(
+  chunks: Array<{ content: string; index: number }>,
+  documentName: string,
+): Promise<void> {
+  console.log(`💾 Storing ${chunks.length} chunks for "${documentName}"...`);
 
-export async function storeDocumentChunks(props: IProps): Promise<void> {
-  console.log(
-    `💾 Storing ${props.chunks.length} chunks for "${props.documentName}"...`,
-  );
+  // Clear ALL existing documents
+  console.log("🗑️ Clearing all existing documents...");
+  const { data: allDocs } = await supabase.from("documents").select("id");
 
-  // Clear any existing chunks for this document (in case of re-upload)
-  const { error: deleteError } = await supabase
-    .from("documents")
-    .delete()
-    .eq("document_name", props.documentName);
+  if (allDocs && allDocs.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("documents")
+      .delete()
+      .in(
+        "id",
+        allDocs.map((doc) => doc.id),
+      );
 
-  if (deleteError) {
-    console.error("Error deleting old chunks:", deleteError);
-    throw new Error("Failed to clear old document data");
+    if (deleteError) {
+      console.error("Error deleting old chunks:", deleteError);
+      throw new Error("Failed to clear old document data");
+    }
+
+    console.log(`✅ Cleared ${allDocs.length} old chunks`);
   }
 
-  // Process chunks one by one (we could batch this, but keeping it simple)
-  for (let i = 0; i < props.chunks.length; i++) {
-    const chunk = props.chunks[i];
-    console.log(`  Processing chunk ${i + 1}/${props.chunks.length}...`);
+  // Process chunks one by one
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+
+    console.log(`  Processing chunk ${i + 1}/${chunks.length}...`);
 
     // Generate embedding for this chunk
     const embedding = await generateEmbedding(chunk.content);
@@ -35,7 +42,7 @@ export async function storeDocumentChunks(props: IProps): Promise<void> {
     const documentChunk: Omit<DocumentChunk, "id" | "created_at"> = {
       content: chunk.content,
       embedding: embedding,
-      document_name: props.documentName,
+      document_name: documentName,
       chunk_index: chunk.index,
     };
 
@@ -50,5 +57,5 @@ export async function storeDocumentChunks(props: IProps): Promise<void> {
     }
   }
 
-  console.log(`✅ Successfully stored ${props.chunks.length} chunks!`);
+  console.log(`✅ Successfully stored ${chunks.length} chunks!`);
 }
